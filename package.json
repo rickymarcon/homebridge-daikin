@@ -1,5 +1,5 @@
 {
-  "name": "@rickymarcon/homebridge-daikin",
+  "name": "homebridge-daikin-unofficial",
   "version": "1.0.0",
   "description": "Daikin support for HomeBridge",
   "main": "dist/index.js",
