@@ -1,0 +1,11 @@
+# Typescript v1 declaration files
+typings/
+
+# Dependencies
+/node_modules
+
+# Output compilation
+dist/
+
+# Logs
+*.log
