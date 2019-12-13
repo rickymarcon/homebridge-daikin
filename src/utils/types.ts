@@ -19,11 +19,32 @@ export enum TemperatureUnit {
   FAHRENHEIT = 'fahrenheit',
 }
 
+export enum Power {
+  OFF = 0,
+  ON = 1,
+}
+
+export enum Mode {
+  AUTO = 0,
+  DEHUMDIFICATOR = 2,
+  COOL = 3,
+  HEAT = 4,
+  FAN = 6,
+}
+
+export enum FanDirection {
+  DISABLED = 0,
+  VERTICAl = 1,
+  HORIZONTAL = 2,
+  ALL = 3,
+}
+
 export interface DaikinAccessoryConfig {
   name: string;
   host: string;
   uuid?: string;
   unit?: TemperatureUnit;
+  swingMode: FanDirection;
 }
 
 export type ControlInfo = {

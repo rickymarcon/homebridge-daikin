@@ -2,9 +2,12 @@ import {
   CharacteristicEventTypes,
   DaikinAccessoryConfig,
   TemperatureUnit,
+  Mode,
+  Power,
+  FanDirection,
 } from './utils/types';
 import DaikinApi from './utils/api';
-import { api, callbackify, parse } from './utils';
+import { api, callbackify } from './utils';
 
 class DaikinAccessory {
   private services: any[] = [];
@@ -14,6 +17,7 @@ class DaikinAccessory {
 
   api: any;
   name: string;
+  swingMode: FanDirection = 0;
   unit: TemperatureUnit = TemperatureUnit.CELSIUS;
 
   constructor(
@@ -34,6 +38,10 @@ class DaikinAccessory {
           `${config.unit} is an unsupported temperature unit! Using default!`
         );
       }
+    }
+
+    if (config.swingMode) {
+      this.swingMode = config.swingMode;
     }
 
     this.getModelInfo();
@@ -114,13 +122,19 @@ class DaikinAccessory {
         callbackify(this.setCoolingThresholdTemperature)
       );
 
+    // Swing Mode
+    service
+      .getCharacteristic(this.Characteristic.SwingMode)
+      .on(CharacteristicEventTypes.GET, callbackify(this.getSwingMode))
+      .on(CharacteristicEventTypes.SET, callbackify(this.setSwingMode));
+
     return service;
   }
 
   private getActive = async () => {
     const { pow, mode } = await this.api.getControlInfo();
-    this.log.info('Power: %s.', pow === 1 ? 'On' : 'Off');
-    return pow === 1
+    this.log.info('Power: %s.', pow === Power.ON ? 'On' : 'Off');
+    return pow === Power.ON
       ? this.Characteristic.Active.ACTIVE
       : this.Characteristic.Active.INACTIVE;
   };
@@ -136,12 +150,12 @@ class DaikinAccessory {
     const params = await this.api.getControlInfo();
     let status = this.Characteristic.CurrentHeaterCoolerState.INACTIVE;
 
-    if (params.pow === 1) {
+    if (params.pow === Power.ON) {
       switch (params.mode) {
-        case 3:
+        case Mode.COOL:
           status = this.Characteristic.CurrentHeaterCoolerState.COOLING;
           break;
-        case 4:
+        case Mode.HEAT:
           status = this.Characteristic.CurrentHeaterCoolerState.HEATING;
           break;
         default:
@@ -159,10 +173,10 @@ class DaikinAccessory {
     let status = params.mode;
 
     switch (params.mode) {
-      case 3:
+      case Mode.COOL:
         status = this.Characteristic.TargetHeaterCoolerState.COOL;
         break;
-      case 4:
+      case Mode.HEAT:
         status = this.Characteristic.TargetHeaterCoolerState.HEAT;
         break;
       default:
@@ -181,13 +195,13 @@ class DaikinAccessory {
 
     switch (state) {
       case this.Characteristic.TargetHeaterCoolerState.AUTO:
-        params.mode = 0;
+        params.mode = Mode.AUTO;
         break;
       case this.Characteristic.TargetHeaterCoolerState.COOL:
-        params.mode = 3;
+        params.mode = Mode.COOL;
         break;
       case this.Characteristic.TargetHeaterCoolerState.HEAT:
-        params.mode = 4;
+        params.mode = Mode.HEAT;
         break;
       default:
         break;
@@ -225,6 +239,21 @@ class DaikinAccessory {
     params.stemp = temp;
     params.dt3 = temp;
 
+    return this.api.setControlInfo(params);
+  };
+
+  private getSwingMode = async () => {
+    const { f_dir: fanDirection } = await this.api.getControlInfo();
+    return fanDirection && fanDirection === FanDirection.DISABLED
+      ? this.Characteristic.SwingMode.SWING_DISABLED
+      : this.Characteristic.SwingMode.SWING_ENABLED;
+  };
+
+  private setSwingMode = async (swing: any) => {
+    const params = await this.api.getControlInfo();
+    if (swing !== this.Characteristic.SwingMode.SWING_DISABLED)
+      swing = this.swingMode;
+    params.f_dir = params.b_f_dir = swing;
     return this.api.setControlInfo(params);
   };
 }
