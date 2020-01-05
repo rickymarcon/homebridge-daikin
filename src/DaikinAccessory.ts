@@ -7,7 +7,7 @@ import {
   FanDirection,
 } from './utils/types';
 import DaikinApi from './utils/api';
-import { api, callbackify } from './utils';
+import { callbackify } from './utils';
 
 class DaikinAccessory {
   private services: any[] = [];
@@ -50,18 +50,18 @@ class DaikinAccessory {
     this.services.push(this.getHeaterCoolerService(this.name));
   }
 
-  getServices() {
+  getServices(): any[] {
     return this.services;
   }
 
-  private async getModelInfo() {
+  private async getModelInfo(): Promise<any> {
     const { model } = await this.api.getModelInfo();
     const { ver } = await this.api.getBasicInfo();
     this.model = model;
     this.firmwareRevision = ver;
   }
 
-  private getInformationService() {
+  private getInformationService(): any {
     const service = new this.Service.AccessoryInformation();
 
     service
@@ -75,7 +75,7 @@ class DaikinAccessory {
     return service;
   }
 
-  private getHeaterCoolerService(name: string) {
+  private getHeaterCoolerService(name: string): any {
     const service = new this.Service.HeaterCooler(name);
 
     // Active
@@ -128,25 +128,31 @@ class DaikinAccessory {
       .on(CharacteristicEventTypes.GET, callbackify(this.getSwingMode))
       .on(CharacteristicEventTypes.SET, callbackify(this.setSwingMode));
 
+    // Rotation Speed
+    service
+      .getCharacteristic(this.Characteristic.RotationSpeed)
+      .on(CharacteristicEventTypes.GET, callbackify(this.getRotationSpeed))
+      .on(CharacteristicEventTypes.SET, callbackify(this.setRotationSpeed));
+
     return service;
   }
 
-  private getActive = async () => {
-    const { pow, mode } = await this.api.getControlInfo();
+  private getActive = async (): Promise<number> => {
+    const { pow } = await this.api.getControlInfo();
     this.log.info('Power: %s.', pow === Power.ON ? 'On' : 'Off');
     return pow === Power.ON
       ? this.Characteristic.Active.ACTIVE
       : this.Characteristic.Active.INACTIVE;
   };
 
-  private setActive = async (power: number) => {
+  private setActive = async (power: number): Promise<void> => {
     const params = await this.api.getControlInfo();
     this.log.info('Power switched to %s.', power === 1 ? 'On' : 'Off');
     params.pow = power;
     return this.api.setControlInfo(params);
   };
 
-  private getHeaterCoolerState = async () => {
+  private getHeaterCoolerState = async (): Promise<number> => {
     const params = await this.api.getControlInfo();
     let status = this.Characteristic.CurrentHeaterCoolerState.INACTIVE;
 
@@ -168,7 +174,7 @@ class DaikinAccessory {
     return status;
   };
 
-  private getTargetHeaterCoolerState = async () => {
+  private getTargetHeaterCoolerState = async (): Promise<number> => {
     const params = await this.api.getControlInfo();
     let status = params.mode;
 
@@ -188,7 +194,7 @@ class DaikinAccessory {
     return status;
   };
 
-  private setTargetHeaterCoolerState = async (state: any) => {
+  private setTargetHeaterCoolerState = async (state: any): Promise<void> => {
     const params = await this.api.getControlInfo();
 
     this.log.debug('TargetHeaterCoolerState changed to %s.', state);
@@ -210,7 +216,7 @@ class DaikinAccessory {
     return this.api.setControlInfo(params);
   };
 
-  private getTemperature = async () => {
+  private getTemperature = async (): Promise<number> => {
     const params = await this.api.getSensorInfo();
     let temperature = params.htemp;
 
@@ -225,16 +231,18 @@ class DaikinAccessory {
     return temperature;
   };
 
-  private getCoolingThresholdTemperature = async () => {
+  private getCoolingThresholdTemperature = async (): Promise<number> => {
     const { stemp: coolingThresholdTemp } = await this.api.getControlInfo();
     return coolingThresholdTemp;
   };
 
-  private setCoolingThresholdTemperature = async (temp: any) => {
+  private setCoolingThresholdTemperature = async (
+    temp: number
+  ): Promise<void> => {
     const params = await this.api.getControlInfo();
 
     temp = Math.round(temp * 2) / 2; // Daikin only supports steps of 0.5 degree.
-    temp = temp.toFixed(1); // Daikin always expects a precision of 1.
+    temp = parseFloat(temp.toFixed(1)); // Daikin always expects a precision of 1.
 
     params.stemp = temp;
     params.dt3 = temp;
@@ -242,18 +250,48 @@ class DaikinAccessory {
     return this.api.setControlInfo(params);
   };
 
-  private getSwingMode = async () => {
+  private getSwingMode = async (): Promise<number> => {
     const { f_dir: fanDirection } = await this.api.getControlInfo();
-    return fanDirection && fanDirection === FanDirection.DISABLED
+    return fanDirection === FanDirection.DISABLED
       ? this.Characteristic.SwingMode.SWING_DISABLED
       : this.Characteristic.SwingMode.SWING_ENABLED;
   };
 
-  private setSwingMode = async (swing: any) => {
+  private setSwingMode = async (swing: number): Promise<void> => {
     const params = await this.api.getControlInfo();
     if (swing !== this.Characteristic.SwingMode.SWING_DISABLED)
       swing = this.swingMode;
+    // eslint-disable-next-line @typescript-eslint/camelcase
     params.f_dir = params.b_f_dir = swing;
+    return this.api.setControlInfo(params);
+  };
+
+  private getRotationSpeed = async (): Promise<number> => {
+    const { f_rate: fanSpeed } = await this.api.getControlInfo();
+    return fanSpeed;
+  };
+
+  private setRotationSpeed = async (speed: number): Promise<void> => {
+    const params = await this.api.getControlInfo();
+    let rate = 'A'; // Auto
+    if (speed > 0 && speed <= 9) {
+      rate = 'B'; // Silent
+    } else if (speed > 9 && speed < 20) {
+      rate = 'A';
+    } else if (speed >= 20 && speed < 30) {
+      rate = '3'; // lvl_1
+    } else if (speed >= 30 && speed < 40) {
+      rate = '4'; // lvl_2
+    } else if (speed >= 40 && speed < 60) {
+      rate = '5'; // lvl_3
+    } else if (speed >= 60 && speed < 80) {
+      rate = '6'; // lvl_4
+    } else if (speed >= 80 && speed <= 100) {
+      rate = '7'; // lvl_5
+    }
+
+    // eslint-disable-next-line @typescript-eslint/camelcase
+    params.f_rate = params.b_f_rate = rate;
     return this.api.setControlInfo(params);
   };
 }

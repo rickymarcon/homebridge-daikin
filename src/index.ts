@@ -1,6 +1,6 @@
 import DaikinAccessory from './DaikinAccessory';
 
-export default (homebridge: any) => {
+export default (homebridge: any): void => {
   homebridge.registerAccessory(
     'homebridge-daikin-unofficial',
     'Daikin',

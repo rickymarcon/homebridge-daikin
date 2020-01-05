@@ -1,14 +1,14 @@
 import request from 'request-promise';
-import { API, DaikinAccessoryConfig } from './types';
+import { API, DaikinParams, DaikinAccessoryConfig } from './types';
 
-function transform(body: any) {
-  const result: Record<string, string> = {};
+function transform(body: string): DaikinParams<string, number | string> {
+  const result: Record<string, string | number> = {};
 
   if (body) {
     const items = body.split(',');
     for (let i = 0; i < items.length; i++) {
       const [key, value] = items[i].split('=');
-      result[key] = isNaN(value) ? value : Number.parseFloat(value);
+      result[key] = isNaN(Number(value)) ? value : Number.parseFloat(value);
     }
   }
 
@@ -40,7 +40,7 @@ class DaikinApi {
   }
 
   // Return basic information.
-  async getBasicInfo(): Promise<any> {
+  async getBasicInfo(): Promise<DaikinParams<string, number | string>> {
     const response = await request({
       ...this.options,
       uri: `${this.options.uri}${API.GET_BASIC_INFO}`,
@@ -49,7 +49,7 @@ class DaikinApi {
   }
 
   // Request Daikin model info.
-  async getModelInfo(): Promise<any> {
+  async getModelInfo(): Promise<DaikinParams<string, number | string>> {
     const response = await request({
       ...this.options,
       uri: `${this.options.uri}${API.GET_MODEL_INFO}`,
@@ -58,7 +58,7 @@ class DaikinApi {
   }
 
   // Request current status parameters.
-  async getControlInfo(): Promise<any> {
+  async getControlInfo(): Promise<DaikinParams<string, number | string>> {
     const response = await request({
       ...this.options,
       uri: `${this.options.uri}${API.GET_CONTROL_INFO}`,
@@ -67,7 +67,7 @@ class DaikinApi {
   }
 
   // Return sensor information such as inside and outside temperatures.
-  async getSensorInfo(): Promise<any> {
+  async getSensorInfo(): Promise<DaikinParams<string, number | string>> {
     const response = await request({
       ...this.options,
       uri: `${this.options.uri}${API.GET_SENSOR_INFO}`,
@@ -76,11 +76,13 @@ class DaikinApi {
   }
 
   // Set status parameters.
-  async setControlInfo(params: any): Promise<any> {
+  async setControlInfo(
+    params: DaikinParams<string, number | string>
+  ): Promise<void> {
     const query = Object.keys(params)
       .map(param => `${param}=${params[param]}`)
       .join('&');
-    const response = await request({
+    await request({
       ...this.options,
       uri: `${this.options.uri}${API.SET_CONTROL_INFO}?${query}`,
     });

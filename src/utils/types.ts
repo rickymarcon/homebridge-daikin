@@ -47,6 +47,10 @@ export interface DaikinAccessoryConfig {
   swingMode: FanDirection;
 }
 
+export type DaikinParams<K extends keyof any, T> = {
+  [P in K]: T;
+};
+
 export type ControlInfo = {
   pow: number;
   mode: string;
